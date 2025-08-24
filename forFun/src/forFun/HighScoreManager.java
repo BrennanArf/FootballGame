@@ -9,7 +9,32 @@ import java.util.*;
  */
 public class HighScoreManager {
     private static final String HIGH_SCORE_FILE = "highscores.txt";
+    private static final String GAME_NAME = "BrennansFootball";
     private ArrayList<HighScore> highScores;
+    
+    /**
+     * Gets the correct path for high score file in AppData directory
+     */
+    private static String getHighScoreFilePath() {
+        String appDataDir = System.getenv("APPDATA");
+        if (appDataDir == null) {
+            // Fallback for non-Windows systems or if APPDATA isn't set
+            appDataDir = System.getProperty("user.home");
+        }
+        
+        // Create game directory in AppData
+        File gameDir = new File(appDataDir, GAME_NAME);
+        if (!gameDir.exists()) {
+            boolean created = gameDir.mkdirs(); // Create directory if it doesn't exist
+            if (!created) {
+                System.err.println("Warning: Could not create directory: " + gameDir.getAbsolutePath());
+                // Fallback to current directory as last resort
+                return HIGH_SCORE_FILE;
+            }
+        }
+        
+        return new File(gameDir, HIGH_SCORE_FILE).getAbsolutePath();
+    }
     
     /**
      * Represents a single high score entry.
@@ -122,7 +147,9 @@ public class HighScoreManager {
      */
     private void loadHighScores() {
         highScores.clear();
-        try (BufferedReader reader = new BufferedReader(new FileReader(HIGH_SCORE_FILE))) {
+        String filePath = getHighScoreFilePath();
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 HighScore score = HighScore.fromString(line);
@@ -133,8 +160,9 @@ public class HighScoreManager {
             Collections.sort(highScores);
         } catch (FileNotFoundException e) {
             // File doesn't exist yet, that's OK
+            System.out.println("No existing high scores file found. A new one will be created.");
         } catch (IOException e) {
-            System.err.println("Error loading high scores: " + e.getMessage());
+            System.err.println("Error loading high scores from " + filePath + ": " + e.getMessage());
         }
     }
     
@@ -142,12 +170,16 @@ public class HighScoreManager {
      * Saves high scores to the file.
      */
     private void saveHighScores() {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(HIGH_SCORE_FILE))) {
+        String filePath = getHighScoreFilePath();
+        
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
             for (HighScore score : highScores) {
                 writer.println(score.toString());
             }
+            System.out.println("High scores saved to: " + filePath);
         } catch (IOException e) {
-            System.err.println("Error saving high scores: " + e.getMessage());
+            System.err.println("Error saving high scores to " + filePath + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -173,5 +205,32 @@ public class HighScoreManager {
         }
         
         return sb.toString();
+    }
+    
+    /**
+     * Debug method to show where the high scores are being stored
+     */
+    public static String getStorageLocation() {
+        return getHighScoreFilePath();
+    }
+    
+    /**
+     * Test method to verify file writing works
+     */
+    public static boolean testFileWriting() {
+        String testFilePath = getHighScoreFilePath().replace("highscores.txt", "test_write.tmp");
+        try {
+            File testFile = new File(testFilePath);
+            try (PrintWriter writer = new PrintWriter(new FileWriter(testFile))) {
+                writer.println("test");
+            }
+            boolean success = testFile.exists() && testFile.delete();
+            System.out.println("File writing test: " + (success ? "SUCCESS" : "FAILED"));
+            System.out.println("Test file path: " + testFilePath);
+            return success;
+        } catch (IOException e) {
+            System.err.println("File writing test FAILED: " + e.getMessage());
+            return false;
+        }
     }
 }
